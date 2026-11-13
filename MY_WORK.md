@@ -143,76 +143,99 @@
 - Saved the starter output for Question 1
 - Committed and pushed: `Set my student ID: 445052781`
 
-**Challenges**:
+**Challenges**:I had no problem with the code at this step, but at first I did not understand the link between the exception, the watchdog and the wrong counters: everything failed at the same time, so I did not know which problem came first.
 
-**Solution**:
+**Solution**: I used the table in the README ("What you see in the console / What it means"). It showed me that two CPUs picking `P1` and a lost process are caused by the missing ready queue lock (Feature 1), so I started with that.
 
-**Time spent**:
-
----
-
-### Entry 2 - [Date and Time]
-**What I did**:
-
-**Details**:
-
-**Challenges**:
-
-**Solution**:
-
-**Time spent**:
+**Time spent**:[30 minutes]
 
 ---
 
-### Entry 3 - [Date and Time]
-**What I did**:
+### Entry 2 - [November 13, 2026, 7:30 PM]
+**What I did**:Feature 1: protected the ready queue with a ReentrantLock
 
 **Details**:
+- Added `import java.util.concurrent.locks.ReentrantLock;`
+- Declared `private final ReentrantLock queueLock` in `ReadyQueue`
+- Wrapped the bodies of `add()`, `poll()`, `processOf()` and `snapshot()` in `queueLock.lock()` / `try` / `finally { queueLock.unlock(); }`
+- Ran the program 5 times: no more exception and no lost process, but context switches were 23 instead of 27 and total service time 75639 instead of 83639 (this is Feature 2)
+- Committed and pushed: `Feature 1: Protected the ready queue with a ReentrantLock`
 
-**Challenges**:
+**Challenges**: I was not sure if the lock is really released in `poll()`, because the `return` statements are inside the `try` block and the method leaves before reaching the end of the code.
 
-**Solution**:
+**Solution**: The README tip says the `finally` block still runs after the `return`, and the slides describe the exit section that must always release permission. So I kept `unlock()` only in `finally` and did not call it before the `return`.
 
-**Time spent**:
+
+**Time spent**: 45 minutes
 
 ---
 
-### Entry 4 - [Date and Time]
-**What I did**:
+### Entry 3 - [November 13, 2026, 8:30 PM]
+**What I did**:Feature 2: protected the three shared statistics with one lock per variable
 
 **Details**:
+- Declared `contextSwitchLock`, `completedLock` and `serviceTimeLock` in `SharedStats`
+- Protected the three update methods and the three getters with lock / try / finally
+- Ran the program 5 times: the first three verification lines were always ✔ (27, 11, 83639); only `Busy-waiting polls` was still 1 to 3
+- Committed and pushed: `Feature 2: Added locks to the shared statistics counters`
 
-**Challenges**:
+**Challenges**:This was the hardest part for me. I did not know if I should use one lock for the three counters or one lock for each counter, and I had to justify my choice. One lock looked simpler and safer, so at first I did not see why three locks would be better.
 
-**Solution**:
 
-**Time spent**:
+**Solution**:I re-read the critical-section part of the slides and the hint in the README that the three variables are independent. I checked the code: no method changes two counters together. So a thread adding service time does not need to wait for a thread counting a context switch. I chose one lock per variable to reduce waiting, and I accepted the cost of having more locks to manage.
+
+**Time spent**: 1 Hours
 
 ---
 
-### Entry 5 - [Date and Time]
-**What I did**:
+### Entry 4 - [November 13, 2026, 9:30 PM]
+**What I did**:Feature 3: replaced busy waiting with a counting semaphore
 
 **Details**:
+- Added `import java.util.concurrent.Semaphore;` and declared `final Semaphore readyCount = new Semaphore(0)` in `ReadyQueue`
+- Called `readyCount.release()` at the end of `add()`, after releasing `queueLock`
+- In `CpuWorker.run()`: replaced the polling code by `readyCount.acquire()` and added the shutdown: the CPU that sees completed == total calls `release(SharedStats.totalCPUs)`, and a CPU that wakes up when everything is completed stops
+- Ran the program 6 times: all four lines ✔, `Busy-waiting polls = 0`, the program ends by itself in about 9 s
+- Committed and pushed: `Feature 3: Replaced busy waiting with a counting semaphore`
 
-**Challenges**:
+**Challenges**: Choosing the initial value of the semaphore and understanding the end of the program: if the CPUs sleep in `acquire()`, who wakes them up when there are no more processes?
 
-**Solution**:
+**Solution**: The slides define the semaphore value as the number of available resources, and the queue is empty at the start, so the value is 0 (the README common mistakes also warn that 1 is wrong). For the end, I followed the README: the CPU that sees the last process complete calls `release(totalCPUs)`, and a CPU that wakes up when everything is completed stops instead of polling.
 
-**Time spent**:
+
+**Time spent**:1 Hours
 
 ---
 
-### Entry 6 - [Optional - Date and Time]
-**What I did**:
+### Entry 5 - [November 13, 2026, 11:00 PM]
+**What I did**:Documentation: wrote the reflection and the technical answers in MY_WORK.md
 
 **Details**:
+- Pasted the verification block of the starter and of my final version in Question 1
+- Answered the four technical questions and the four reflection questions
+- Committed and pushed: `Docs: Completed reflection and technical answers`
 
-**Challenges**:
+**Challenges**: Explaining the starter failure with my own numbers. The starter mismatch (25 instead of 27) was not a lost update on the counter but the lost process `P2`, so I had to separate the two problems.
 
-**Solution**:
+**Solution**:I used the output of the version with only Feature 1 (23 instead of 27, 75639 instead of 83639) to explain the lost update on `contextSwitchCount`, and the starter output to explain the lost process.
 
-**Time spent**:
+**Time spent**:1 Hours
+
+---
+
+### Entry 6 - [Optional - November 14, 2026, 1:20 AM]
+**What I did**:Recorded the video and added the link
+
+**Details**:- Recorded the demo in VS Code (repository, 3 features, execution, concept, commit history)
+- Uploaded `445052781_Assignment3_Demo.mp4`, set it to "Anyone with the link", tested it in incognito
+- Committed and pushed: `Docs: Added demo video link`
+
+
+**Challenges**:Keeping the video between 2 and 3 minutes while showing everything required (repository, 3 features, execution, one concept, commits).
+
+**Solution**:I prepared the order of what to show, did a test recording, and shortened my explanation of the code so the verification block stays visible a few seconds.
+
+**Time spent**: 20 minutes
 
 ---
 
