@@ -243,13 +243,14 @@
 
 > 💡 **TIP:** Fill this in **last**, after all entries are written.
 
-**Total time spent on assignment**: [X hours]
+**Total time spent on assignment**: [6 hours]
 
-**Most challenging part**:
+**Most challenging part**:Choosing the lock granularity for the statistics (one lock for the three counters or one lock per counter) and being able to justify it.
 
-**Most interesting learning**:
+**Most interesting learning**: Seeing two CPUs pick the same process `P1` in my own output, and that a simple `count++` can lose updates because it is three steps and not one.
 
-**What I would do differently next time**:
+**What I would do differently next time**: Start earlier and spread my work over more days, and write each log entry right after the session instead of later.
+
 
 ---
 
@@ -269,7 +270,7 @@
 
 **Your Answer:** *(5-7 sentences)*
 
-[Write your answer here.]
+I learned that a race condition happens when several threads change the same shared data and the result depends on the order of their steps. Before this assignment I thought `count++` was one operation, but it is a read, an addition and a write, and a thread can be stopped between them. In my starter output I saw CPU-1 and CPU-2 both pick `P1`, and `P2` was lost without running, so the problem is not only theory. I learned that the code that touches shared data is a critical section, and that a `ReentrantLock` gives mutual exclusion on it. I also understood why `unlock()` must always be in `finally`: if an exception happens, the lock is still released. Finally, I learned that a counting semaphore can count the processes in the queue and make a CPU sleep instead of checking the queue again and again.
 
 ## Question 2: What was the most challenging part of this assignment?
 
@@ -277,7 +278,7 @@
 
 **Your Answer:** *(5-7 sentences)*
 
-[Write your answer here.]
+The most challenging part for me was Feature 2, choosing the lock granularity for the three statistics. The code was not difficult to write, but I had to decide between one lock for the three counters or one lock per counter, and justify it in this file and in the video. One lock looked simpler and safer, so at first I did not understand why I would need three. I also worried that more locks could create more problems, like a deadlock. It was hard because both solutions give correct results in the verification block, so the output alone could not tell me which one is better. I had to think about how the threads actually use the counters, not only about whether the program works.
 
 ## Question 3: How did you overcome the challenges you faced?
 
@@ -285,7 +286,7 @@
 
 **Your Answer:** *(5-7 sentences)*
 
-[Write your answer here.]
+I went back to the Chapter 5 slides, especially the critical-section problem and the mutex lock part. Then I re-read the README, which says that the three variables are independent. I checked the code of `SharedStats` and saw that no method changes two counters at the same time. So if they share one lock, a thread adding service time waits for a thread counting a context switch for no reason, and with `RaceWindow.pause()` inside each update this waiting is even longer. Three locks keep each counter safe and let the threads work in parallel when they update different counters. About the deadlock worry, I understood it only happens if a thread holds two locks and waits for another, and my methods never take two locks at the same time.
 
 ## Question 4: Where can synchronization concepts be applied in real-world applications?
 
@@ -293,20 +294,19 @@
 
 **Your Answer:** *(5-7 sentences)*
 
-[Write your answer here.]
+A good example from my life is course registration at the university: when registration opens, many students try to take the last seat in the same section at the same moment. Without a critical section, two students could both see one seat free and both get registered, exactly like two CPUs picking `P1` in my starter. Booking an appointment, a seat or a ticket in an app is the same problem, so the check and the booking must be done together under a lock, like `poll()` in my `ReadyQueue`. In banking, two withdrawals on the same balance at the same time can lose an update, like `contextSwitchCount` lost increments in my run. In all these cases the shared data needs mutual exclusion. A counting semaphore can also be used when a system has a fixed number of resources, like a limited number of seats or service windows.
 
 ### Optional: What would you like to learn more about?
 
-[Any topics related to synchronization or operating systems that you're curious about?]
+I would like to learn more about deadlocks (detection and prevention) and how real operating systems and databases handle many readers and writers at the same time.
 
 ### Optional: How confident do you feel about synchronization concepts now?
 
-[Beginner / Intermediate / Confident. What do you understand well? What needs more practice?]
+Intermediate. I understand race conditions, mutex locks with `try/finally` and the counting semaphore well. I need more practice with fairness, starvation and the classical problems like dining philosophers.
 
 ### Optional: Feedback on the assignment
 
-[Any comments? Was it helpful? Too easy or hard? Suggestions?]
-
+The assignment was helpful because the verification block shows clearly if the synchronization is correct, and `RaceWindow` makes the bugs appear in every run instead of randomly.
 ---
 
 # Part C: Technical Answers (0.5 mark)
@@ -327,20 +327,42 @@
 
 **Your Answer:** *(3-5 sentences)*
 
-[Write your answer here.]
+In the run of the original starter with my ID (11 processes, quantum 4000 ms, 2 CPUs), all four lines were wrong: context switches 25 instead of 27 (-2), completed processes 10 instead of 11 (-1), total service time 77686 instead of 83639 (-5953 ms) and 1208 busy-waiting polls. The output shows why: `[CPU-2] picks P1` and `[CPU-1] picks P1` appear one after the other, because both CPUs read the same head during the `RaceWindow.pause()` of `poll()`, and each one then removed an element, so `P2` (burst 5953 ms = 2 quanta) was removed without ever being executed and CPU-1 crashed with `IllegalThreadStateException` when it started P1's thread a second time. After Feature 1 the counters still lost updates (context switches 23 instead of 27 and service time 75639 instead of 83639, exactly two quanta of 4000 ms lost), which is the lost update explained below. On a real machine the same thing can happen without `RaceWindow`, because the OS can preempt a thread (or two cores can run in parallel) between the read and the write of `count++`, which are separate instructions. It is hard to detect because this window is only a few nanoseconds wide, so the bug appears rarely, randomly, and may disappear when we add prints or use a debugger.
 
 Verification block of the **original starter**:
 ```
-[Paste the verification block (or the exception/watchdog message) of the starter here]
+  ┌─ [CPU-2] picks P1 │ Ready queue: [P2 → P3 → P4 → P5 → P6 → P7 → P8 → P9 → P10 → P11]
+  ┌─ [CPU-1] picks P1 │ Ready queue: [P3 → P4 → P5 → P6 → P7 → P8 → P9 → P10 → P11]
+Exception in thread "CPU-1" java.lang.IllegalThreadStateException
+...
+⛔ WATCHDOG: the simulation did not finish (40 s). A process was lost, or a CPU is blocked forever, or the 'completed' counter lost an update.
+
+═══ VERIFICATION (expected values are computed from YOUR seed) ═══
+  Context switches (quanta executed)     expected 27       observed 25       ✘ MISMATCH
+  Completed processes                    expected 11       observed 10       ✘ MISMATCH
+  Total service time (ms)                expected 83639    observed 77686    ✘ MISMATCH
+  Busy-waiting polls (must be 0)         expected 0        observed 1208     ✘ MISMATCH
+  ✘ At least one check failed (see the ✘ lines above): a race condition or busy waiting is still present.
 ```
 
 Verification block of **my final version**:
 ```
-[Paste the verification block of your final version here (all lines ✔)]
-```
+═══ VERIFICATION (expected values are computed from YOUR seed) ═══
+  Context switches (quanta executed)     expected 27       observed 27       ✔
+  Completed processes                    expected 11       observed 11       ✔
+  Total service time (ms)                expected 83639    observed 83639    ✔
+  Busy-waiting polls (must be 0)         expected 0        observed 0        ✔
+  ✔ All shared values are consistent.```
 
 **Explanation of the timeline:**
-[Explain the lost update step by step.]
+Lost update on `contextSwitchCount` (version with Feature 1 only, where I observed 23 instead of 27). Suppose the counter is 12 and the processes running on CPU-1 and CPU-2 both start a quantum:
+1. CPU-1 (its process thread) executes `int tmp = contextSwitchCount;` and reads **12**.
+2. CPU-1 calls `RaceWindow.pause()` and is "preempted" for 1 ms.
+3. CPU-2 executes `int tmp = contextSwitchCount;` and also reads **12** (CPU-1 has not written yet).
+4. CPU-1 wakes up and writes `contextSwitchCount = 12 + 1` → **13**.
+5. CPU-2 writes `contextSwitchCount = 12 + 1` → **13**.
+
+Two quanta started but the counter only went from 12 to 13: the last write wins and one increment is lost. With `contextSwitchLock`, step 3 cannot happen: CPU-2 blocks on `lock()` until CPU-1 has written 13, then reads 13 and writes 14.
 
 ## Question 2: Critical Sections and Lock Granularity
 
@@ -350,12 +372,17 @@ Verification block of **my final version**:
 
 **Your Answer:** *(3-5 sentences)*
 
-[Write your answer here.]
+I protected two groups of critical sections. The ready queue (`list` + `map`) is protected by one lock, `queueLock`, in the four methods `add()`, `poll()`, `processOf()` and `snapshot()`, because the list and the map always change together and form one shared object. For the statistics I chose **one lock per variable** (`contextSwitchLock`, `completedLock`, `serviceTimeLock`): the three counters are independent (no method updates two of them at the same time), so a thread that adds service time should not wait for a thread that counts a context switch. The trade-off is more lock objects to manage (and a possible deadlock if one day a method needed two of them in different orders), against less contention and more parallelism; one global lock would be simpler but would make all threads wait for each other, even with `RaceWindow.pause()` inside. The queue has a different lock than the statistics because they are unrelated data: if they shared one lock, a CPU doing `poll()` (with its 1 ms pause) would block every process thread that only wants to update a counter. Mutual exclusion is guaranteed because every read and write of a shared variable is between `lock()` and `unlock()` of the same lock, and `unlock()` is always in `finally`, so a lock is never kept forever (progress). A default `ReentrantLock` is **not fair**: a thread that just released the lock can take it again before a waiting thread, so bounded waiting is not strictly guaranteed in theory (possible starvation); in this program the critical sections are very short, so in practice every thread gets the lock quickly, and `new ReentrantLock(true)` would give FIFO fairness at a performance cost.
 
 | Critical section (variable / method) | Lock used | Why it needs protection |
 |---|---|---|
-| [e.g., `ReadyQueue.poll()`] | [lock name] | [reason] |
-| [...] | [...] | [...] |
+| `ReadyQueue.add()` (`list`, `map`) | `queueLock` | Two CPUs re-enqueueing at the same time modify the `LinkedList` and `HashMap`, which are not thread-safe |
+| `ReadyQueue.poll()` (`list`) | `queueLock` | Read of the head + `removeFirst()` must be one step, otherwise two CPUs pick the same process and another one is lost (P1 / P2 in my starter run) |
+| `ReadyQueue.processOf()` (`map`) | `queueLock` | Reading the map while another CPU puts a new entry is unsafe |
+| `ReadyQueue.snapshot()` (`list`, `map`) | `queueLock` | Iterating while another CPU modifies the list throws `ConcurrentModificationException` (seen in one of my starter runs) |
+| `incrementContextSwitch()` / `getContextSwitchCount()` | `contextSwitchLock` | Read-modify-write of `contextSwitchCount` loses increments (23 instead of 27 after Feature 1) |
+| `incrementCompletedProcess()` / `getCompletedProcessCount()` | `completedLock` | A lost update would make the CPUs wait for a count that never reaches 11 (watchdog) |
+| `addServiceTime()` / `getTotalServiceTime()` | `serviceTimeLock` | Lost additions (75639 instead of 83639 after Feature 1); a `long` read is not even guaranteed atomic |
 
 ## Question 3: Busy Waiting vs Semaphore
 
@@ -365,7 +392,7 @@ Verification block of **my final version**:
 
 **Your Answer:** *(3-5 sentences)*
 
-[Write your answer here.]
+In the starter, a CPU that finds the queue empty increments `busyWaitPolls`, sleeps 20 ms and checks the queue again, in a loop that only stops when `completedProcessCount == totalProcesses`. This is busy waiting: the CPU thread stays in the running/ready state and keeps checking a condition instead of doing useful work; in my starter run it polled the empty queue **1208** times (CPU-2 kept polling because the lost process P2 never completed), and even after Features 1 and 2 it still polled 1 to 3 times at the end. My semaphore `readyCount` represents **the number of processes currently waiting in the ready queue**: `add()` calls `release()` (signal) after inserting a process, and a CPU calls `acquire()` (wait) before `poll()`, so it is **blocked** (sleeping, no CPU used) when the value is 0. Its initial value is **0** because the queue is empty when the `ReadyQueue` is created; with a wrong value like 1 a CPU could pass `acquire()` and `poll()` an empty queue. Right after the 11 initial `add()` calls of `main` its value is **11** (one permit per process of my run). At the end no process will ever be added again, so the CPUs blocked in `acquire()` would sleep forever (a deadlock-like situation stopped by the watchdog); that is why the CPU that observes `completed == totalProcesses` calls `release(totalCPUs)` (here 2 permits): each CPU wakes up, sees that everything is completed, and terminates, so my program ends by itself in about 9 seconds.
 
 ## Question 4: Classical Problems and Deadlock
 
@@ -376,24 +403,26 @@ Verification block of **my final version**:
 **Your Answer:** *(3-5 sentences)*
 
 **Classical problem and roles**:
-[Name the problem; who is the producer, who is the consumer?]
+It is the **producer-consumer (bounded-buffer) problem**, with an unbounded buffer: the ready queue is the shared buffer and `readyCount` plays the role of the `full` semaphore of the slides. The `main` thread is a producer (it adds the 11 initial processes), and the CPUs (`CpuWorker`) are consumers because they take processes with `acquire()` + `poll()`; but the CPUs are **also producers**, because a process that is not finished after its quantum is put back with `add()`, which calls `release()`.
 
 **Semaphores for a bounded queue (name and initial value)**:
-[Name the three semaphores and their initial values.]
+- `mutex` = **1** (binary semaphore, mutual exclusion on the queue; it would replace `queueLock`)
+- `full` = **0** (number of processes in the queue; this is my `readyCount`)
+- `empty` = **K** (number of free slots; `add()` would call `wait(empty)` before inserting and `poll()` would call `signal(empty)` after removing)
 
 **Deadlock scenario and prevention**:
-[Describe the scenario and the necessary condition you would break.]
+Suppose the queue is full (`empty` = 0) and a CPU wants to re-enqueue its process: if it calls `wait(mutex)` first and **then** `wait(empty)`, it blocks on `empty` while **holding** the mutex. Another CPU that wants to `poll()` (the only action that could free a slot and `signal(empty)`) blocks on `wait(mutex)`, so each one waits for the other forever: deadlock (in my unbounded version, the same would happen if a CPU called `readyCount.acquire()` while holding `queueLock`). The four necessary conditions are mutual exclusion, hold and wait, no preemption and circular wait; I would break **hold and wait** by always waiting on the counting semaphore **before** taking the mutex (`wait(empty)` then `wait(mutex)`, like the slides), and never holding a lock while blocking. That is exactly what my code does: `acquire()` in `CpuWorker` is called without `queueLock`, and `release()` in `add()` is called after `unlock()`. For two locks taken in different orders, I would break **circular wait** by imposing one global order (always the same lock first), like the resource-hierarchy solution of the dining philosophers.
 
 ## Summary
 
 **Key concepts I understood through these questions:**
-1.
-2.
-3.
+1. A race condition is a read-modify-write that is interrupted: the last write wins and an update is lost
+2. A mutex lock (`ReentrantLock` with `try/finally`) gives mutual exclusion on a critical section, readers included
+3. A counting semaphore initialized to 0 lets consumers block instead of busy waiting, and needs a shutdown signal at the end
 
 **Concepts I need to study more:**
-1.
-2.
+1. Fairness and starvation with non-fair locks (bounded waiting)
+2. Deadlock prevention and the four necessary conditions in more detail
 
 ---
 
