@@ -32,11 +32,11 @@
 
 | Field | Your Answer |
 |-------|-------------|
-| **Full Name** | [Write your full name here] |
-| **Student ID** | [Write your student ID here] |
-| **University Email** | [yourid]@std.psau.edu.sa |
-| **GitHub Username** | [your-github-username] |
-| **Repository Link** | [Paste your repository link here] |
+| **Full Name** | Osamah Salah Bin Saeedu |
+| **Student ID** | 445052781 |
+| **University Email** | 445052781@std.psau.edu.sa |
+| **GitHub Username** | OsamahBinSeaadu|
+| **Repository Link** | https://github.com/OsamahBinSeaadu/OS-Assignment3-Osamah-Salah-BinSaeedu.git |
  
 ---
 
