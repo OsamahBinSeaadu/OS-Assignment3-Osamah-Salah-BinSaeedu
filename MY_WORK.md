@@ -132,10 +132,16 @@
 
 ## Your Development Log
 
-### Entry 1 - [Date and Time]
-**What I did**:
+### Entry 1 - [November 13, 2026, 7:00 PM]
+**What I did**:Forked the repository, set my student ID and ran the original starter
 
 **Details**:
+- Forked `makopt/OS-Assignment3-Starter-481`, renamed it to `OS-Assignment3-Osama-BinSaeedo` and checked that it is public
+- Changed line 304 to `int studentID = 445052781;`
+- My parameters: 11 processes, time quantum 4000 ms, 2 CPUs
+- Ran the original starter: CPU-2 and CPU-1 both picked `P1`, then `IllegalThreadStateException` on CPU-1, `P2` was never executed and the watchdog stopped the program after 40 s
+- Saved the starter output for Question 1
+- Committed and pushed: `Set my student ID: 445052781`
 
 **Challenges**:
 
